@@ -59,11 +59,13 @@ jobs:
 
           # Hearables Android BERT inference step
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          DRIVE_FOLDER: ${{ secrets.DRIVE_FOLDER }}
 
           # Email delivery
           EMAIL_USERNAME: ${{ secrets.EMAIL_USERNAME }}
           EMAIL_PASSWORD: ${{ secrets.EMAIL_PASSWORD }}
           NOTIFY_EMAIL: ${{ secrets.NOTIFY_EMAIL }}
+          CC_EMAILS: ${{ secrets.CC_EMAILS }}
         run: python run_all.py
 
       - name: Upload all Excel files as GitHub Artifacts
