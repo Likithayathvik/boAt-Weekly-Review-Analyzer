@@ -59,6 +59,7 @@ jobs:
 
           # Hearables Android BERT inference step
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          DRIVE_FOLDER: ${{ secrets.DRIVE_FOLDER }}
 
           # Email delivery
           EMAIL_USERNAME: ${{ secrets.EMAIL_USERNAME }}

@@ -20,7 +20,9 @@ warnings.filterwarnings("ignore")
 
 # ── CONFIG ─────────────────────────────────────────────────────────────
 EXCEL_PATH   = "Android_HearablesApp_Review.xlsx"
-DRIVE_FOLDER = "1HfgqJyPg1R4hL7RUQHC-XjQRECIPuSt7"
+DRIVE_FOLDER = os.environ.get('DRIVE_FOLDER')
+if not DRIVE_FOLDER:
+    raise SystemExit("❌ Missing required secret: DRIVE_FOLDER")
 MODEL_CACHE  = "model_cache"
 OUTPUT_SHEET = "Negative_Reviews"
 BATCH_SIZE   = 16
