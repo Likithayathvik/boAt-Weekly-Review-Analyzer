@@ -1,0 +1,68 @@
+name: CI — Validate Review Pipelines
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Cache pip packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: pip-ci-${{ hashFiles('requirements.txt') }}
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run CI validation (real APIs, no email sent)
+        env:
+          GOOGLE_PLAY_CREDENTIALS_JSON_CREST: ${{ secrets.GOOGLE_PLAY_CREDENTIALS_JSON_CREST }}
+          GOOGLE_PLAY_CREDENTIALS_JSON_HEARABLE_WEARABLE: ${{ secrets.GOOGLE_PLAY_CREDENTIALS_JSON_HEARABLE_WEARABLE }}
+          ANDROID_APP_ID_CREST:     ${{ secrets.ANDROID_APP_ID_CREST }}
+          ANDROID_APP_ID_HEARABLES: ${{ secrets.ANDROID_APP_ID_HEARABLES }}
+          ANDROID_APP_ID_WEARABLES: ${{ secrets.ANDROID_APP_ID_WEARABLES }}
+          APPLE_PRIVATE_KEY_CREST: ${{ secrets.APPLE_PRIVATE_KEY_CREST }}
+          APPLE_PRIVATE_KEY_HEARABLE_WEARABLE: ${{ secrets.APPLE_PRIVATE_KEY_HEARABLE_WEARABLE }}
+          APPLE_KEY_ID_CREST:    ${{ secrets.APPLE_KEY_ID_CREST }}
+          APPLE_ISSUER_ID_CREST: ${{ secrets.APPLE_ISSUER_ID_CREST }}
+          APPLE_APP_ID_CREST:    ${{ secrets.APPLE_APP_ID_CREST }}
+          APP_DISPLAY_NAME_IOS_CREST: ${{ secrets.APP_DISPLAY_NAME_IOS_CREST }}
+          APPLE_KEY_ID_HEARABLE_WEARABLE:    ${{ secrets.APPLE_KEY_ID_HEARABLE_WEARABLE }}
+          APPLE_ISSUER_ID_HEARABLE_WEARABLE: ${{ secrets.APPLE_ISSUER_ID_HEARABLE_WEARABLE }}
+          APPLE_APP_ID_HEARABLES: ${{ secrets.APPLE_APP_ID_HEARABLES }}
+          APP_DISPLAY_NAME_IOS_HEARABLES: ${{ secrets.APP_DISPLAY_NAME_IOS_HEARABLES }}
+          APPLE_APP_ID_WEARABLES: ${{ secrets.APPLE_APP_ID_WEARABLES }}
+          APP_DISPLAY_NAME_IOS_WEARABLES: ${{ secrets.APP_DISPLAY_NAME_IOS_WEARABLES }}
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          DRIVE_FOLDER: ${{ secrets.DRIVE_FOLDER }}
+        run: python ci_validate.py
+
+      - name: Upload generated Excel files for inspection
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ci_validation_outputs_${{ github.run_id }}
+          path: |
+            android/crest/*.xlsx
+            android/hearables/*.xlsx
+            android/wearables/*.xlsx
+            ios/crest/*.xlsx
+            ios/hearables/*.xlsx
+            ios/wearables/*.xlsx
+          retention-days: 14
+          if-no-files-found: ignore
