@@ -64,6 +64,7 @@ jobs:
           EMAIL_USERNAME: ${{ secrets.EMAIL_USERNAME }}
           EMAIL_PASSWORD: ${{ secrets.EMAIL_PASSWORD }}
           NOTIFY_EMAIL: ${{ secrets.NOTIFY_EMAIL }}
+          CC_EMAILS: ${{ secrets.CC_EMAILS }}
         run: python run_all.py
 
       - name: Upload all Excel files as GitHub Artifacts

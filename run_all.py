@@ -164,12 +164,19 @@ def send_consolidated_email(results):
     EMAIL_PASSWORD = os.environ['EMAIL_PASSWORD']
     TO_EMAIL       = os.environ.get('NOTIFY_EMAIL', '').strip() or 'boatqatest@gmail.com'
 
+    # CC recipients — read from CC_EMAILS secret (comma-separated).
+    # Currently commented out below; uncomment the msg['Cc'] line and the
+    # recipients list line in smtplib.send_message() to activate.
+    CC_EMAILS = os.environ.get('CC_EMAILS', '').strip()
+    cc_list   = [e.strip() for e in CC_EMAILS.split(',') if e.strip()] if CC_EMAILS else []
+
     succeeded = [(label, path) for label, path in results if path]
     no_data   = [label for label, path in results if not path]
 
     msg            = MIMEMultipart()
     msg['From']    = EMAIL_USERNAME
     msg['To']      = TO_EMAIL
+    # msg['Cc']    = ", ".join(cc_list)   # ← uncomment to enable CC recipients
     msg['Subject'] = f"boAt Weekly Review Reports (All Platforms) — {datetime.now().strftime('%d %b %Y')}"
 
     lines = ["Hello,", "", "Please find attached this week's review reports.", ""]
@@ -203,9 +210,13 @@ def send_consolidated_email(results):
 
     with smtplib.SMTP_SSL('smtp.gmail.com', 465) as server:
         server.login(EMAIL_USERNAME, EMAIL_PASSWORD)
+        # To enable CC: change the line below to
+        # server.send_message(msg, to_addrs=[TO_EMAIL] + cc_list)
         server.send_message(msg)
 
     print(f"\n✅ Consolidated email sent to {TO_EMAIL} with {len(succeeded)} attachment(s)")
+    if cc_list:
+        print(f"   (CC_EMAILS secret is set but CC is currently commented out — not sent to: {', '.join(cc_list)})")
 
 # ── MAIN ─────────────────────────────────────────────────────────────────────
 if __name__ == "__main__":
