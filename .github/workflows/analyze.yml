@@ -1,0 +1,99 @@
+name: boAt Weekly Review Analyzer (All Platforms)
+
+on:
+  workflow_dispatch:
+  repository_dispatch:
+    types: [weekly-review-trigger]
+
+jobs:
+  analyze:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Cache pip packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: pip-all-${{ hashFiles('requirements.txt') }}
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run all 6 review pipelines and send consolidated email
+        env:
+          # Android — Google Play Developer API service accounts
+          GOOGLE_PLAY_CREDENTIALS_JSON_CREST: ${{ secrets.GOOGLE_PLAY_CREDENTIALS_JSON_CREST }}
+          GOOGLE_PLAY_CREDENTIALS_JSON_HEARABLE_WEARABLE: ${{ secrets.GOOGLE_PLAY_CREDENTIALS_JSON_HEARABLE_WEARABLE }}
+
+          # Android — package names (no longer hardcoded in main.py)
+          ANDROID_APP_ID_CREST:     ${{ secrets.ANDROID_APP_ID_CREST }}
+          ANDROID_APP_ID_HEARABLES: ${{ secrets.ANDROID_APP_ID_HEARABLES }}
+          ANDROID_APP_ID_WEARABLES: ${{ secrets.ANDROID_APP_ID_WEARABLES }}
+
+          # iOS — Apple App Store Connect API keys
+          APPLE_PRIVATE_KEY_CREST: ${{ secrets.APPLE_PRIVATE_KEY_CREST }}
+          APPLE_PRIVATE_KEY_HEARABLE_WEARABLE: ${{ secrets.APPLE_PRIVATE_KEY_HEARABLE_WEARABLE }}
+
+          # iOS — Key ID / Issuer ID / App ID / display name (no longer hardcoded)
+          APPLE_KEY_ID_CREST:    ${{ secrets.APPLE_KEY_ID_CREST }}
+          APPLE_ISSUER_ID_CREST: ${{ secrets.APPLE_ISSUER_ID_CREST }}
+          APPLE_APP_ID_CREST:    ${{ secrets.APPLE_APP_ID_CREST }}
+          APP_DISPLAY_NAME_IOS_CREST: ${{ secrets.APP_DISPLAY_NAME_IOS_CREST }}
+
+          APPLE_KEY_ID_HEARABLE_WEARABLE:    ${{ secrets.APPLE_KEY_ID_HEARABLE_WEARABLE }}
+          APPLE_ISSUER_ID_HEARABLE_WEARABLE: ${{ secrets.APPLE_ISSUER_ID_HEARABLE_WEARABLE }}
+          APPLE_APP_ID_HEARABLES: ${{ secrets.APPLE_APP_ID_HEARABLES }}
+          APP_DISPLAY_NAME_IOS_HEARABLES: ${{ secrets.APP_DISPLAY_NAME_IOS_HEARABLES }}
+
+          APPLE_APP_ID_WEARABLES: ${{ secrets.APPLE_APP_ID_WEARABLES }}
+          APP_DISPLAY_NAME_IOS_WEARABLES: ${{ secrets.APP_DISPLAY_NAME_IOS_WEARABLES }}
+
+          # Hearables Android BERT inference step
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+
+          # Email delivery
+          EMAIL_USERNAME: ${{ secrets.EMAIL_USERNAME }}
+          EMAIL_PASSWORD: ${{ secrets.EMAIL_PASSWORD }}
+          NOTIFY_EMAIL: ${{ secrets.NOTIFY_EMAIL }}
+        run: python run_all.py
+
+      - name: Upload all Excel files as GitHub Artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: boAt_Weekly_Reviews_${{ github.run_id }}
+          path: |
+            android/crest/*.xlsx
+            android/hearables/*.xlsx
+            android/wearables/*.xlsx
+            ios/crest/*.xlsx
+            ios/hearables/*.xlsx
+            ios/wearables/*.xlsx
+          retention-days: 90
+          if-no-files-found: warn
+
+      - name: Send failure email
+        if: failure()
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.gmail.com
+          server_port: 465
+          username: ${{ secrets.EMAIL_USERNAME }}
+          password: ${{ secrets.EMAIL_PASSWORD }}
+          subject: "❌ boAt Weekly Review Analyzer FAILED"
+          to: likithamdl06@gmail.com
+          from: boAt Trainer
+          body: |
+            The weekly boAt review analyzer pipeline failed.
+            Check logs:
+            https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+            — boAt R&D QA Automation
