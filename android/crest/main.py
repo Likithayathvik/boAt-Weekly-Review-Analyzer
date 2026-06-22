@@ -39,7 +39,7 @@ XLSX_FILE = 'Android_CrestApp_Review.xlsx'
 SCOPES    = ['https://www.googleapis.com/auth/androidpublisher']
 
 # ── GLOBALS ─────────────────────────────────────────────────
-App_Rating  = "N/A"
+App_Rating  = None  # calculated by App_Rating_Finder() from this week's reviews
 App_Version = "N/A"
 lowest_date = None
 latest_date = None
@@ -197,7 +197,8 @@ def App_Version_Finder():
     workbook = openpyxl.load_workbook(XLSX_FILE)
     sheet    = workbook.active
 
-    APP_VERSION_COL = 6   # column F — App Version
+    # App Version is column I (9) per the new column order
+    APP_VERSION_COL = 9
     highest_version = None
 
     for row in range(2, sheet.max_row + 1):
@@ -209,6 +210,39 @@ def App_Version_Finder():
 
     App_Version = highest_version if highest_version else "N/A"
     print(f"  Highest App Version: {App_Version}")
+    workbook.close()
+
+# ── STEP 2b: CALCULATE AVERAGE APP RATING FROM FETCHED REVIEWS ──────────────
+def App_Rating_Finder():
+    """
+    Google Play Developer API has no endpoint for the app's overall public
+    star rating (that figure lives only on the Play Console / Play Store
+    web pages). As an approximation, calculate the average of all fetched
+    review ratings for this week instead of leaving it as a hardcoded N/A.
+    """
+    global App_Rating
+
+    workbook = openpyxl.load_workbook(XLSX_FILE)
+    sheet    = workbook.active
+
+    RATINGS_COL = 3  # column C — Ratings
+    ratings = []
+
+    for row in range(2, sheet.max_row + 1):
+        val = sheet.cell(row=row, column=RATINGS_COL).value
+        if val is not None:
+            try:
+                ratings.append(float(val))
+            except (ValueError, TypeError):
+                continue
+
+    if ratings:
+        avg = sum(ratings) / len(ratings)
+        App_Rating = f"{avg:.1f}"
+    else:
+        App_Rating = "N/A"
+
+    print(f"  Average App Rating (this week's reviews): {App_Rating}")
     workbook.close()
 
 # ── MAIN ────────────────────────────────────────────────────
@@ -235,13 +269,14 @@ if __name__ == '__main__':
 
     # Step 6 — Get App Version + Date Range
     App_Version_Finder()
+    App_Rating_Finder()
     Review_Date_Calculator()
 
-    # Step 7 — Inject globals into original script before Summary
+    # Step 7 — Inject App Version / Rating into the BFAT module before Summary
+    # (lowest_date / latest_date are already set correctly inside orig by
+    #  Review_Date_Calculator() above — do NOT overwrite them here)
     orig.App_Version = App_Version
     orig.App_Rating  = App_Rating
-    orig.lowest_date = lowest_date
-    orig.latest_date = latest_date
 
     # Step 8 — Generate Summary sheet
     Summary()
