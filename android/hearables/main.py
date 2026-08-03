@@ -17,6 +17,7 @@ import BFAT_HApp_PlayStore_Code as orig
 from datetime import datetime, timedelta
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
+from google_play_scraper import app as gplay_app
 
 from BFAT_HApp_PlayStore_Code import (
     SheetNameChange,
@@ -37,7 +38,7 @@ XLSX_FILE = 'Android_HearablesApp_Review.xlsx'
 SCOPES    = ['https://www.googleapis.com/auth/androidpublisher']
 
 # ── GLOBALS ─────────────────────────────────────────────────
-App_Rating  = "N/A"   # not available from public Play Store
+App_Rating  = "N/A"
 App_Version = "N/A"
 lowest_date = None
 latest_date = None
@@ -208,6 +209,41 @@ def App_Version_Finder():
     print(f"  Highest App Version: {App_Version}")
     workbook.close()
 
+
+def App_Rating_Finder():
+    """
+    Fetch live app rating and version from the public Play Store page
+    using google_play_scraper. Falls back to week-average if blocked.
+    """
+    global App_Rating
+    global App_Version
+
+    try:
+        from google_play_scraper import app as gplay_app
+        result      = gplay_app(APP_ID, lang="en", country="in")
+        score       = result.get("score")
+        version     = result.get("version")
+        App_Rating  = f"{score:.1f}" if isinstance(score, (int, float)) else "N/A"
+        App_Version = version if version else App_Version
+        print(f"  Live Play Store Rating  : {App_Rating}")
+        print(f"  Live Play Store Version : {App_Version}")
+    except Exception as e:
+        print(f"  ⚠️  Live Play Store scrape failed ({e}); falling back to this week's review average.")
+        workbook = openpyxl.load_workbook(XLSX_FILE)
+        sheet    = workbook.active
+        RATINGS_COL = 3
+        ratings = []
+        for row in range(2, sheet.max_row + 1):
+            val = sheet.cell(row=row, column=RATINGS_COL).value
+            if val is not None:
+                try:
+                    ratings.append(float(val))
+                except (ValueError, TypeError):
+                    continue
+        App_Rating = f"{sum(ratings)/len(ratings):.1f}" if ratings else "N/A"
+        print(f"  Fallback App Rating (this week avg): {App_Rating}")
+        workbook.close()
+
 # ── MAIN ────────────────────────────────────────────────────
 if __name__ == '__main__':
 
@@ -232,13 +268,14 @@ if __name__ == '__main__':
 
     # Step 6 — Get App Version + Date Range
     App_Version_Finder()
+    App_Rating_Finder()
     Review_Date_Calculator()
 
-    # Step 7 — Inject globals into original script before Summary
+    # Step 7 — Inject App Version / Rating into the BFAT module before Summary
+    # (lowest_date / latest_date are already set correctly inside orig by
+    #  Review_Date_Calculator() above — do NOT overwrite them here)
     orig.App_Version = App_Version
     orig.App_Rating  = App_Rating
-    orig.lowest_date = lowest_date
-    orig.latest_date = latest_date
 
     # Step 8 — Generate Summary sheet
     Summary()
