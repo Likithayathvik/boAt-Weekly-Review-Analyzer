@@ -211,35 +211,37 @@ def App_Version_Finder():
 # ── STEP 2b: CALCULATE AVERAGE APP RATING FROM FETCHED REVIEWS ──────────────
 def App_Rating_Finder():
     """
-    Google Play Developer API has no endpoint for the app's overall public
-    star rating (that figure lives only on the Play Console / Play Store
-    web pages). As an approximation, calculate the average of all fetched
-    review ratings for this week instead of leaving it as a hardcoded N/A.
+    Fetch live app rating and version from the public Play Store page
+    using google_play_scraper. Falls back to week-average if blocked.
     """
     global App_Rating
+    global App_Version
 
-    workbook = openpyxl.load_workbook(XLSX_FILE)
-    sheet    = workbook.active
-
-    RATINGS_COL = 3  # column C — Ratings
-    ratings = []
-
-    for row in range(2, sheet.max_row + 1):
-        val = sheet.cell(row=row, column=RATINGS_COL).value
-        if val is not None:
-            try:
-                ratings.append(float(val))
-            except (ValueError, TypeError):
-                continue
-
-    if ratings:
-        avg = sum(ratings) / len(ratings)
-        App_Rating = f"{avg:.1f}"
-    else:
-        App_Rating = "N/A"
-
-    print(f"  Average App Rating (this week's reviews): {App_Rating}")
-    workbook.close()
+    try:
+        from google_play_scraper import app as gplay_app
+        result      = gplay_app(APP_ID, lang="en", country="in")
+        score       = result.get("score")
+        version     = result.get("version")
+        App_Rating  = f"{score:.1f}" if isinstance(score, (int, float)) else "N/A"
+        App_Version = version if version else App_Version
+        print(f"  Live Play Store Rating  : {App_Rating}")
+        print(f"  Live Play Store Version : {App_Version}")
+    except Exception as e:
+        print(f"  ⚠️  Live Play Store scrape failed ({e}); falling back to this week's review average.")
+        workbook = openpyxl.load_workbook(XLSX_FILE)
+        sheet    = workbook.active
+        RATINGS_COL = 3
+        ratings = []
+        for row in range(2, sheet.max_row + 1):
+            val = sheet.cell(row=row, column=RATINGS_COL).value
+            if val is not None:
+                try:
+                    ratings.append(float(val))
+                except (ValueError, TypeError):
+                    continue
+        App_Rating = f"{sum(ratings)/len(ratings):.1f}" if ratings else "N/A"
+        print(f"  Fallback App Rating (this week avg): {App_Rating}")
+        workbook.close()
 
 # ── MAIN ────────────────────────────────────────────────────
 if __name__ == '__main__':
