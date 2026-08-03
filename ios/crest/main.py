@@ -240,6 +240,24 @@ def style_summary_sheet(ws):
     for col_letter, width in SUMMARY_COL_WIDTHS.items():
         ws.column_dimensions[col_letter].width = width
 
+
+# ── FETCH APP RATING + LATEST VERSION FROM ITUNES ────────────────────────────
+def fetch_itunes_info():
+    """Fetch overall app rating and latest version from iTunes public lookup API."""
+    try:
+        url  = f"https://itunes.apple.com/lookup?id={APP_ID}&country=in"
+        resp = requests.get(url, timeout=10).json()
+        results = resp.get("results", [])
+        if results:
+            r = results[0]
+            rating  = round(r.get("averageUserRating", 0), 1)
+            version = r.get("version", "N/A")
+            print(f"  iTunes lookup: rating={rating}, version={version}")
+            return str(rating), version
+    except Exception as e:
+        print(f"  ⚠️  iTunes lookup failed: {e}")
+    return "N/A", "N/A"
+
 # ── SAVE TO EXCEL ─────────────────────────────────────────────────────────────
 def save_to_xlsx(rows, cutoff_dt, today):
     if not rows:
@@ -264,7 +282,8 @@ def save_to_xlsx(rows, cutoff_dt, today):
         # Row 1 — header
         ws_sum.append(["App Name", "App Rating", "Latest App Version", "Review Data"])
         # Row 2 — data
-        ws_sum.append([APP_NAME, "N/A*", "N/A", date_range])
+        app_rating, app_version = fetch_itunes_info()
+        ws_sum.append([APP_NAME, f"{app_rating}*", app_version, date_range])
         # Row 3 — empty
         ws_sum.append([])
         # Row 4 — Category/Count header
