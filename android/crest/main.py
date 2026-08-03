@@ -17,6 +17,7 @@ import BFAT_CrestApp_PlayStore_Code as orig
 from datetime import datetime, timedelta
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
+from google_play_scraper import app as gplay_app
 
 from BFAT_CrestApp_PlayStore_Code import (
     SheetNameChange,
@@ -212,16 +213,40 @@ def App_Version_Finder():
     print(f"  Highest App Version: {App_Version}")
     workbook.close()
 
-# ── STEP 2b: CALCULATE AVERAGE APP RATING FROM FETCHED REVIEWS ──────────────
+# ── STEP 2b: FETCH LIVE APP RATING + VERSION (public Play Store scrape) ─────
 def App_Rating_Finder():
     """
-    Google Play Developer API has no endpoint for the app's overall public
-    star rating (that figure lives only on the Play Console / Play Store
-    web pages). As an approximation, calculate the average of all fetched
-    review ratings for this week instead of leaving it as a hardcoded N/A.
-    """
-    global App_Rating
+    Google Play Developer API (androidpublisher) has no endpoint for the
+    app's overall public star rating — that figure only exists on the
+    public Play Store listing page, not through any authenticated API.
 
+    Uses google-play-scraper (unofficial, no auth) to read the same
+    'score' and 'version' values shown live on the Play Store page —
+    the real number customers see, not an approximation.
+
+    Falls back to averaging this week's fetched reviews (old behaviour)
+    only if the live scrape fails for any reason, so the pipeline never
+    breaks or reports a blank N/A when a fallback is possible.
+    """
+    global App_Rating, App_Version
+
+    try:
+        result = gplay_app(APP_ID, lang='en', country='in')
+        score   = result.get('score')
+        version = result.get('version')
+
+        App_Rating  = f"{score:.1f}" if isinstance(score, (int, float)) else "N/A"
+        if version:
+            App_Version = str(version)
+
+        print(f"  Live Play Store Rating  : {App_Rating}")
+        print(f"  Live Play Store Version : {App_Version}")
+        return
+    except Exception as e:
+        print(f"  ⚠️  Live Play Store scrape failed ({e}); "
+              f"falling back to this week's review average.")
+
+    # ── Fallback: average of this week's fetched review ratings ────────────
     workbook = openpyxl.load_workbook(XLSX_FILE)
     sheet    = workbook.active
 
@@ -242,7 +267,7 @@ def App_Rating_Finder():
     else:
         App_Rating = "N/A"
 
-    print(f"  Average App Rating (this week's reviews): {App_Rating}")
+    print(f"  Fallback Average App Rating (this week's reviews): {App_Rating}")
     workbook.close()
 
 # ── MAIN ────────────────────────────────────────────────────
