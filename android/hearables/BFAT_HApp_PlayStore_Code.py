@@ -40,6 +40,7 @@ PREFIXES = [
     "Rockerz",
     "Immortal",
     "Airdopes Ace",
+    "Alpha Gen 2",
     "Airdopes Alpha",
     "Airdopes",
     "Aavante Bar",
@@ -53,23 +54,35 @@ DEVICE_TYPE_ALIAS = {
     "avante bar": "Aavante Bar",
     "unity": "Boat Unity",
     "airpods": "Airdopes",
+    "partypal": "PartyPal",
+    "alpha gen 2": "Airdopes Alpha Gen 2",
 }
 
-CATEGORY_KEYWORDS = ["battery information","charging information","Crash","battery", "Close","connect", "custom equalizer","Equalizer","Diagnostics",
+CATEGORY_KEYWORDS = ["battery information","charging information","Crash","battery", "Close","connect","not in the app","dual connection", "custom equalizer","Equalizer","Diagnostics",
                      "Login","log into","log", "Location", "tap", "button", "touch","EQ", "fw update","firmware update","Update",
                      "phone number","mobile number","otp",
-                     "noise cancellation","anc",
-                     "freez","privacy","policy","account","screen","download","install","load","stuck","support","warranty","app open","warranty","service","details",
+                     "noise cancellation","anc","sound setting","sound settings",
+                     "freez","privacy","policy","account","screen","download","install","load","stuck","isn't working","not working","isn't opening","not opening","support","warranty","app open","warranty","service","details",
                      "mydetails","personal information","personal","email address","email",
-                     "control",
-                     "compatible","customer care","complaint","service","ldac","tablet","tab","ipad","internet", "offline",]
+                     "control","not so much customisation","not much customization",
+                     "compatible","customer care","complaint","service","ldac","tablet","tab","ipad","internet", "offline","syncing","hard reset","worst earbuds","one side works","don't buy","add more options",]
 
 PRIORITY_KEYWORDS = [
     "custom equalizer",
+    "not in the app",
+    "not so much customisation",
+    "not much customization",
+    "dual connection",
+    "isn't working",
+    "not working",
+    "isn't opening",
+    "not opening",
     "anc",
     "equalizer",
     "eq",
     "noise cancellation",
+    "sound setting",
+    "sound settings",
     "tablet",
     "tab",
     "ipad",
@@ -123,7 +136,7 @@ SDK_PRODUCTS = [
     "Nirvana Ion ANC", "Nirvana Ion", "Airdopes Flex 454 ANC", "Airdopes 800",
     "Rockerz 255 Max", "Airdopes 300", "NIRVANA 525ANC", "Airdopes 341ANC", "Airdopes 393ANC",
     "Airdopes 172", "Rockerz 255 Pro+", "Rockerz Trinity Gen 2", "Rockerz 333 Pro",
-    "Rockerz 333", "Rockerz 330 Pro",
+    "Rockerz 333", "Rockerz 330 Pro", "Airdopes Alpha Gen 2",
 ]
 
 NON_SDK_PRODUCTS = [
@@ -155,13 +168,17 @@ CONSOLIDATION_MAP = {
     "touch": "Button Customization",
     "button": "Button Customization",
     "customization": "Button Customization",
+    "not so much customisation": "Limited Feature Functionality",
+    "not much customization": "Limited Feature Functionality",
     "control": "Button Customization",
     "crash": "App Crash",
     "close": "App Crash",
     "app close": "App Crash",
     "connect": "Connectivity",
+    "dual connection": "Dual Connection Issue",
     "connectivity": "Connectivity",
     "detect": "Connectivity",
+    "not in the app": "Connectivity",
     "fw update": "Firmware Update",
     "firmware update": "Firmware Update",
     "battery information": "Battery Information",
@@ -171,6 +188,8 @@ CONSOLIDATION_MAP = {
     "battery": "Battery Information",
     "percentage": "Battery Information",
     "noise cancellation": "Noise Cancellation Issue",
+    "sound setting": "Equalizer issue",
+    "sound settings": "Equalizer issue",
     "anc": "Noise Cancellation Issue",
     "internet": "Internet Requirement Issue",
     "offline": "Internet Requirement Issue",
@@ -199,6 +218,10 @@ CONSOLIDATION_MAP = {
     "screen": "App Issue",
     "load": "App Issue",
     "stuck": "App Issue",
+    "isn't working": "App Issue",
+    "isn't opening": "App Issue",
+    "not opening": "App Issue",
+    "not working": "App Issue",
     "support": "SKU not supported",
     "diagnostics": "Smart diagnostics",
     "warranty": "Service Issue",
@@ -214,9 +237,21 @@ CONSOLIDATION_MAP = {
     "tab": "App not supported",
     "ipad": "App not supported",
     "button": "Funtionality/ Validation issue",
+    "syncing": "Product Issue",
+    "hard reset": "Product Issue",
+    "worst earbuds": "Product Issue",
+    "one side works": "Product Issue",
+    "don't buy": "Product Issue",
+    "add more options": "App Suggestion",
+    "improve the experience": "App Suggestion",
 }
 
 EXCEPTION_PHRASES = ["even though", "even", "though", "issue"]
+
+AIROHA_PRODUCTS = {
+    "Nirvana Lucid", "Nirvana Space", "Airdopes Flex 454 ANC", "NIRVANA 525ANC",
+    "Rockerz 255 Pro+", "Rockerz 333 Pro", "Rockerz 333", "Rockerz 330 Pro",
+}
 
 #***********************************************************************#
 
@@ -238,6 +273,8 @@ def extract_device_names(text, threshold=70):
         return "Unknown Device"
 
     txt = text.lower()
+    # Strip hyphens between letters (e.g. "Air-Dopes" -> "airdopes")
+    txt = re.sub(r'(?<=[a-z])-(?=[a-z])', '', txt)
     version_strings = re.findall(r'\b\d+\.\d+\b', txt)
     words = re.findall(r"[a-zA-Z0-9]+", txt)
     windows = words \
@@ -263,20 +300,24 @@ def extract_device_names(text, threshold=70):
     SUFFIX_MAP = {
         "anc elite": "ANC Elite", "elite anc": "Elite ANC", "anc pro": "ANC Pro",
         "ancpro": "ANC Pro", "anc": "ANC", "pro+": "Pro+", "pro plus": "Pro Plus",
-        "pro": "Pro", "plus": "Plus", "prime": "Prime", "gen 2": "Gen 2",
-        "gen2": "Gen 2", "elite": "Elite", "ultra pro": "Ultra Pro", "ultra": "Ultra",
-        "max": "Max", "v1": "v1", "v2": "v2", "v2 pro": "V2 Pro", "v2pro": "V2 Pro",
-        "r": "R", "z plus": "Z Plus", "zplus": "Z Plus", "z": "Z", "x tws": "X TWS",
-        "xtws": "X TWS", "hidef": "HiDef", "hi def": "HiDef", "loop": "loop",
-        "tws": "TWS", "crown": "Crown", "ivy pro": "Ivy Pro", "ivy": "Ivy",
-        "space": "Space", "lumos": "Lumos", "wave": "Wave", "neo": "Neo",
-        "proclip": "ProClip", "pro clip": "ProClip", "grande": "Grande", "luxe": "Luxe",
-        "iris": "Iris", "crystl": "Crystl", "lucid": "Lucid", "nebula": "Nebula",
-        "eutopia": "Eutopia", "supreme": "Supreme", "aspire": "Aspire",
-        "zenith pro": "Zenith Pro", "zenithpro": "Zenith Pro", "zenith": "Zenith",
-        "summit": "Summit", "ace": "Ace", "101v2": "101v2", "101 v2": "101v2",
-        "111v2": "111v2", "111 v2": "111v2", "joy": "Joy", "alpha": "Alpha",
-        "katana": "katana", "kick": "kick", "progear": "Progear", "shiney": "Shiney",
+        "pro 2": "Pro 2", "pro": "Pro", "plus": "Plus", "prime": "Prime",
+        "gen 2": "Gen 2", "gen2": "Gen 2", "elite": "Elite",
+        "ultra pro": "Ultra Pro", "ultra": "Ultra", "max": "Max",
+        "v1": "v1", "v2": "v2", "v2 pro": "V2 Pro", "v2pro": "V2 Pro",
+        "r": "R", "z plus": "Z Plus", "zplus": "Z Plus", "z": "Z",
+        "x tws": "X TWS", "xtws": "X TWS", "hidef": "HiDef", "hi def": "HiDef",
+        "loop": "loop", "tws": "TWS", "crown": "Crown",
+        "ivy pro": "Ivy Pro", "ivy": "Ivy", "space": "Space", "lumos": "Lumos",
+        "wave": "Wave", "neo": "Neo", "proclip": "ProClip", "pro clip": "ProClip",
+        "grande": "Grande", "luxe": "Luxe", "iris": "Iris",
+        "crystl": "Crystl", "crystal": "Crystl", "lucid": "Lucid",
+        "nebula": "Nebula", "eutopia": "Eutopia", "supreme": "Supreme",
+        "aspire": "Aspire", "zenith pro": "Zenith Pro", "zenithpro": "Zenith Pro",
+        "zenith": "Zenith", "summit": "Summit", "ace": "Ace",
+        "101v2": "101v2", "101 v2": "101v2", "111v2": "111v2", "111 v2": "111v2",
+        "joy": "Joy", "alpha": "Alpha", "katana": "katana", "kick": "kick",
+        "progear": "Progear", "shiney": "Shiney",
+        "alpha gen 2": "alpha gen 2", "alpha gen2": "alpha gen 2",
     }
 
     model_num = None
@@ -362,6 +403,15 @@ def extract_device_names(text, threshold=70):
                     break
             if detected_suffix:
                 break
+        if not detected_suffix:
+            for key in sorted(SUFFIX_MAP.keys(), key=lambda x: -len(x)):
+                for num in nums:
+                    pattern = rf"{num}{re.escape(key)}\b"
+                    if re.search(pattern, txt, flags=re.IGNORECASE):
+                        detected_suffix = SUFFIX_MAP[key]
+                        break
+                if detected_suffix:
+                    break
         if detected_suffix:
             return f"{model_num} {detected_suffix}".strip()
         fallback = process.extractOne(
@@ -555,7 +605,7 @@ def Negative_Reviews():
     consolidated_reasons = []
     products_set = set(products)
 
-    SDK_ONLY_FEATURE_REASONS = {"anc", "eq", "equalizer", "custom equalizer", "noise cancellation"}
+    SDK_ONLY_FEATURE_REASONS = {"anc", "eq", "equalizer", "custom equalizer", "noise cancellation", "sound setting", "sound settings"}
     BARE_PRODUCT_SERIES = {
         "Nirvana", "Airdopes", "Stone", "Rockerz", "Aavante", "Aavante Bar", "Immortal",
     }
@@ -568,6 +618,8 @@ def Negative_Reviews():
 
         if d != "Unknown Device" and d not in BARE_PRODUCT_SERIES and not is_valid_device(d, products_set):
             consolidated = "SKU not supported"
+        elif sku_category == "Non-SDK" and r in {"eq", "equalizer"}:
+            consolidated = "Non-SDK - EQ Option"
         elif sku_category == "Non-SDK" and r in SDK_ONLY_FEATURE_REASONS:
             consolidated = "Non-SDK less feature"
         elif r == "update":
@@ -577,8 +629,11 @@ def Negative_Reviews():
                 consolidated = "App Update issue"
         else:
             base_consolidated = CONSOLIDATION_MAP.get(r, "Generic Comments")
-            if base_consolidated in ["Equalizer issue", "Noise Cancellation Issue"]:
-                consolidated = "Equalizer and Anc removed for Airhoa SDK to support 16kb page"
+            if base_consolidated in ["Equalizer issue", "Noise Cancellation Issue", "Custom Equalizer issue"]:
+                if d == "Unknown Device" or d in AIROHA_PRODUCTS:
+                    consolidated = "Equalizer and Anc removed for Airhoa SDK to support 16kb page"
+                else:
+                    consolidated = base_consolidated
             else:
                 consolidated = base_consolidated
 
