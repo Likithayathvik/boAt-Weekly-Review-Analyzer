@@ -19,27 +19,31 @@ import shutil
 import smtplib
 import openpyxl
 import pandas as pd
-from bs4 import BeautifulSoup
-from selenium import webdriver
 from transformers import pipeline
 from rapidfuzz import fuzz, process
 import openpyxl
 from openpyxl import load_workbook
 from email.mime.text import MIMEText
 from datetime import datetime, timedelta
-from selenium.webdriver.common.by import By
 from email.mime.multipart import MIMEMultipart
-from selenium.webdriver.common.keys import Keys
 from email.mime.application import MIMEApplication
 from openpyxl.utils.dataframe import dataframe_to_rows
-from selenium.webdriver.support.ui import WebDriverWait
 from openpyxl.styles import Font, PatternFill, Alignment
-from selenium.webdriver.support import expected_conditions as EC
-from selenium.common.exceptions import ElementNotInteractableException
-from selenium.common.exceptions import ElementClickInterceptedException
 import time
-import undetected_chromedriver as uc
 import unicodedata
+
+# NOTE: Selenium / undetected_chromedriver / BeautifulSoup are intentionally
+# NOT imported here at module level. This file gets imported by main.py
+# (the cloud/GitHub Actions pipeline) purely for its analysis functions --
+# main.py fetches reviews via the Play Developer API and never touches
+# scraping. The cloud environment doesn't have Selenium installed (it
+# doesn't need it -- see requirements.txt), so a module-level import here
+# would break that import entirely before main.py could ever reach the
+# functions it actually needs. Instead, these are imported locally inside
+# the specific functions below that actually use them
+# (HearablesApp_WebScraping, find_elements_in_review_container,
+# AppRating_find_element_in_html), so local/manual scraping runs still
+# work exactly as before.
 
 # ── Device-name prefixes. Order doesn't affect matching (process.extractOne
 # scores against the whole list every time), but specific prefixes are still
@@ -248,6 +252,16 @@ EXCEPTION_PHRASES = ["even though", "even", "though", "issue"]
 #***********************************************************************#
 
 def HearablesApp_WebScraping():
+    # Local imports: only needed for actual scraping, not for the analysis
+    # functions main.py imports this module for. See note at top of file.
+    from bs4 import BeautifulSoup
+    from selenium.webdriver.common.by import By
+    from selenium.webdriver.common.keys import Keys
+    from selenium.webdriver.support.ui import WebDriverWait
+    from selenium.webdriver.support import expected_conditions as EC
+    from selenium.common.exceptions import ElementClickInterceptedException
+    import undetected_chromedriver as uc
+
     # Create a Chrome instance using undetected-chromedriver
     options = uc.ChromeOptions()
     options.add_argument("--no-first-run --no-service-autorun --password-store=basic")
@@ -411,6 +425,7 @@ def HearablesApp_WebScraping():
         driver.quit()
 
 def find_elements_in_review_container(html_content):
+    from bs4 import BeautifulSoup
 
     global App_Rating_Value
 
@@ -1285,6 +1300,8 @@ def Remove_Html():
         print(f"The folder path '{folder_path}' does not exist.")
 
 def AppRating_find_element_in_html(file_path):
+    from bs4 import BeautifulSoup
+
     with open(file_path, 'r', encoding='utf-8') as file:
         html_content = file.read()
 
