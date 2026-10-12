@@ -37,13 +37,12 @@ import unicodedata
 # (the cloud/GitHub Actions pipeline) purely for its analysis functions --
 # main.py fetches reviews via the Play Developer API and never touches
 # scraping. The cloud environment doesn't have Selenium installed (it
-# doesn't need it -- see requirements.txt), so a module-level import here
-# would break that import entirely before main.py could ever reach the
-# functions it actually needs. Instead, these are imported locally inside
-# the specific functions below that actually use them
-# (HearablesApp_WebScraping, find_elements_in_review_container,
-# AppRating_find_element_in_html), so local/manual scraping runs still
-# work exactly as before.
+# doesn't need it), so a module-level import here would break that import
+# entirely before main.py could ever reach the functions it actually needs.
+# Instead, these are imported locally inside the specific functions below
+# that actually use them (HearablesApp_WebScraping,
+# find_elements_in_review_container, AppRating_find_element_in_html), so
+# local/manual scraping runs still work exactly as before.
 
 # ── Device-name prefixes. Order doesn't affect matching (process.extractOne
 # scores against the whole list every time), but specific prefixes are still
@@ -66,6 +65,7 @@ PREFIXES = [
     "Rockerz",
     "Immortal",
     "Airdopes Ace",
+    "Alpha Gen 2",
     "Airdopes Alpha",
     "Airdopes",
     "Aavante Bar",
@@ -74,38 +74,53 @@ PREFIXES = [
     "Airdopes Unity",
 ]
 
-# Alias map: normalise fuzzy-matched prefix → canonical display name
 DEVICE_TYPE_ALIAS = {
     "aavante": "Aavante Bar",
     "avante bar": "Aavante Bar",
     "unity": "Boat Unity",
     "airpods": "Airdopes",
+    "partypal": "PartyPal",
+    "alpha gen 2":"Airdopes Alpha Gen 2",
 }
 
-CATEGORY_KEYWORDS = ["battery information","charging information","Crash","battery", "Close","connect", "custom equalizer","Equalizer","Diagnostics",
-                     "Login","log into","log", "Location", "tap", "button", "touch","EQ", "fw update","firmware update","Update",
-                     "phone number","mobile number","otp",
-                     "noise cancellation","anc",
-                     "freez","privacy","policy","account","screen","download","install","load","stuck","support","warranty","app open","warranty","service","details",
+CATEGORY_KEYWORDS = ["battery information","charging information","Crash","battery","battery drain","sound quality", "Close","connect","not in the app","dual connection", "custom equalizer","Equalizer","Diagnostics",
+                     "Login","log into","log","sign in","register","verify", "Location", "tap", "button", "touch","EQ", "fw update","firmware update","Update",
+                     "phone number","mobile number","login","otp",
+                     "noise cancellation","anc","sound setting","sound settings","long press",
+                     "freez","privacy","policy","account","screen","download","install","load","stuck","slow","support","warranty","app open","warranty","service","details",
                      "mydetails","personal information","personal","email address","email",
-                     "control",
-                     "compatible","customer care","complaint","service","ldac","tablet","tab","ipad","internet", "offline",]
+                     "control","not so much customisation","not much customization","give more controls","extra feature","touch control","remap",
+                     "compatible","customer care","complaint","service","ldac","tablet","tab","ipad","internet", "offline","syncing","hard reset","worst earbuds","one side works","don't buy","add more options","improve the experience","service ticket","physical damage","not getting the otp",]
 
 PRIORITY_KEYWORDS = [
     "custom equalizer",
+    "not in the app",
+    "not so much customisation",
+    "not much customization",
+    "dual connection",
+    "service ticket",
+    "physical damage",
+    "long press",
+    "extra feature",
+    "touch control",
+    "remap",
     "anc",
     "equalizer",
     "eq",
     "noise cancellation",
+    "sound setting",
+    "sound settings",
     "tablet",
     "tab",
     "ipad",
     "button",
     "battery information",  
     "charging information",
+    "battery drain",
     "battery",
     "percentage",
     "mobile number",        
+    "sign in",
     "log in",
     "login",
     "firmware update",
@@ -127,13 +142,7 @@ FORCE_UPDATE_SIGNALS = [
 ]
 
 THRESHOLD = 80
-# Global variables declaration
-global App_Rating
-global App_Version
-global lowest_date
-global latest_date
 
-# ── SDK products: devices supported via the Airoha/boAt SDK integration ────
 SDK_PRODUCTS = [
     "Airdopes Plus 421 ANC", "Airdopes Plus 224", "Airdopes Plus Spark ANC", "Airdopes Plus Wave",
     "Airdopes Plus Neo", "Airdopes Plus 222", "Airdopes ProClip", "Airdopes Plus 223",
@@ -153,12 +162,11 @@ SDK_PRODUCTS = [
     "Rockerz 333", "Rockerz 330 Pro",
 ]
 
-# ── Non-SDK products: legacy / non-Airoha-SDK devices ──────────────────────
 NON_SDK_PRODUCTS = [
     "Rockerz plus 440", "Airdopes 71 Gen 2", "Airdopes 148 Gen 2", "Airdopes 138",
     "Immortal 131", "Airdopes 163", "Rockerz 150 Pro", "Airdopes 91", "Airdopes 141 Gen 2",
     "Airdopes 141 ANC", "Rockerz 480", "Rockerz 421", "Airdopes Ace Gen 2",
-    "Airdopes Alpha Gen 2", "Airdopes 213", "Airdopes 212", "Airdopes 219", "Rockerz 425",
+    "Airdopes 213", "Airdopes 212", "Airdopes 219", "Rockerz 425",
     "Rockerz 460", "Rockerz 413", "Rockerz 412", "Rockerz 411", "Rockerz 203", "Rockerz 202",
     "Rockerz 113", "Rockerz 112", "Rockerz 111", "Rockerz Plus 550", "Rockerz 550",
     "Airdopes 138 Gen 2", "Airdopes 131 Gen 2", "Aavante Bar 950", "Aavante Bar Aspire",
@@ -172,11 +180,8 @@ NON_SDK_PRODUCTS = [
     "Airdopes Alpha", "Airdopes 161", "Airdopes 141", "Airdopes 131",
 ]
 
-# Combined list — used everywhere the old flat `products` list was used
-# (fuzzy fallback matching, SKU validity checks, etc.)
 products = SDK_PRODUCTS + NON_SDK_PRODUCTS
 
-# Map Reason keywords to Consolidated Reason
 CONSOLIDATION_MAP = {
     "custom equalizer": "Custom Equalizer issue",
     "equalizer": "Equalizer issue",
@@ -186,33 +191,49 @@ CONSOLIDATION_MAP = {
     "touch": "Button Customization",
     "button": "Button Customization",
     "customization": "Button Customization",
+    "not so much customisation": "Limited Feature Functionality",
+    "not much customization": "Limited Feature Functionality",
     "control": "Button Customization",
+    "touch control": "Button Customization",
+    "remap": "Button Customization",
+    "give more controls": "App Feature Addition",
+    "extra feature": "App Feature Addition",
     "crash": "App Crash",
     "close": "App Crash",
     "app close": "App Crash",
     "connect": "Connectivity",
-    "connectivity": "Connectivity",
+    "dual connection": "Dual Connection Issue",
+    "connectivity": "Connectivity",               
     "detect": "Connectivity",
+    "not in the app": "Connectivity",
     "fw update": "Firmware Update",
     "firmware update": "Firmware Update",
-    "battery information": "Battery Information",
+    "battery information": "Battery Information",  
     "charging information": "Battery Information",
     "charging percentage": "Battery Information",
     "battery percentage": "Battery Information",
+    "battery drain": "Product Issue",
+    "sound quality": "Product Issue",
     "battery": "Battery Information",
-    "percentage": "Battery Information",
+    "percentage": "Battery Information",          
     "noise cancellation": "Noise Cancellation Issue",
+    "long press": "Button Mapping",
+    "sound setting": "Equalizer issue",
+    "sound settings": "Equalizer issue",
     "anc": "Noise Cancellation Issue",
     "internet": "Internet Requirement Issue",
     "offline": "Internet Requirement Issue",
     "phone number": "App Privacy Issue",
     "mobile number": "App Privacy Issue",
-    "otp": "App Privacy Issue",
+    "otp": "Login issue",
     "personal information": "App Privacy Issue",
     "email address": "App Privacy Issue",
     "email": "App Privacy Issue",
     "login": "Login issue",
-    "log in": "Login issue",
+    "sign in": "Login issue",
+    "register": "Login issue",
+    "verify": "Login issue",
+    "log in": "Login issue",                       
     "log into": "Login issue",
     "log": "Login issue",
     "issue": "App Issue",
@@ -223,17 +244,24 @@ CONSOLIDATION_MAP = {
     "update": "App Update issue",
     "app space": "App size",
     "download": "App download Issue",
-    "install": "App download Issue",
+    "install": "App download Issue",              
     "privacy": "App Privacy Issue",
     "policy": "App Policy Issue",
-    "account": "Login Issue",
+    "account": "Login issue",
     "screen": "App Issue",
     "load": "App Issue",
     "stuck": "App Issue",
+    "slow": "App Issue",
+    "isn't working": "App Issue",
+    "isn't opening": "App Issue",
+    "not opening": "App Issue",
+    "not working": "App Issue",
     "support": "SKU not supported",
     "diagnostics": "Smart diagnostics",
     "warranty": "Service Issue",
     "service": "Service Issue",
+    "service ticket": "Service Issue",
+    "physical damage": "Service Issue",
     "details": "Privacy Issue",
     "mydetails": "App Privacy Issue",
     "personal": "App Privacy Issue",
@@ -244,12 +272,73 @@ CONSOLIDATION_MAP = {
     "tablet": "App not supported",
     "tab": "App not supported",
     "ipad": "App not supported",
-    "button": "Funtionality/ Validation issue",
+    "syncing": "Product Issue",
+    "hard reset": "Product Issue",
+    "worst earbuds": "Product Issue",
+    "one side works": "Product Issue",
+    "don't buy": "Product Issue",
+    "add more options":"App Suggestion",
+    "improve the experience":"App Suggestion",
+    "not getting the otp":"Login issue",
 }
 
 EXCEPTION_PHRASES = ["even though", "even", "though", "issue"]
 
-#***********************************************************************#
+# Very short, generic words that the sentiment model tends to score as
+# strongly "positive" even though they're actually neutral/non-committal,
+# not genuine praise (e.g. "average" scored 97% positive by the model, but
+# "average" means mediocre, not good). Checked with punctuation stripped so
+# variants like "u'yes" are still caught.
+AMBIGUOUS_NEUTRAL_WORDS = {
+    "average", "okay", "ok", "fine", "decent", "meh", "mesh",
+    "yes", "u yes", "uyes", "hmm", "so so", "soso", "alright", "fair",
+}
+
+
+def is_ambiguous_neutral_review(text):
+    """
+    Returns True if the review, once punctuation is stripped, is just one of
+    the short neutral/filler words above -- meaning it should NOT be trusted
+    as positive sentiment even if the ML model scores it that way.
+    """
+    cleaned = re.sub(r"[^a-z0-9]+", " ", text.lower()).strip()
+    return cleaned in AMBIGUOUS_NEUTRAL_WORDS
+
+
+# Multi-word priority keywords that should ONLY match on an exact literal
+# substring, never via fuzzy fallback. "dual connection" specifically was
+# fuzzy-matching reviews that only contained "connection" (no "dual" at
+# all) -- fuzz.partial_ratio scored a plain "connect...connection failed"
+# review at exactly 80, clearing the threshold purely off the shared
+# "connection" substring. Real typos of "dual connection" are rare enough
+# that losing fuzzy tolerance here is worth eliminating that false-positive
+# class entirely.
+EXACT_ONLY_KEYWORDS = {
+    "dual connection",
+    # "touch" fuzzy-matched unrelated text like "ability to change" (the
+    # fragment "ty to ch" scores 80% similarity to "touch" purely by letter
+    # overlap, with zero actual relation to touch controls) -- same class of
+    # false positive as "dual connection" above.
+    "touch",
+    # "not in the app" fuzzy-matched "login issue very common in this app"
+    # at 81.5% similarity, purely from "...in this app" overlapping "...in
+    # the app" -- nothing to do with a missing device in the app.
+    "not in the app",
+    # "long press" fuzzy-matched "long-pressing" (a verb describing an
+    # action taken while troubleshooting a DIFFERENT complaint, e.g. an ANC
+    # review that only mentions long-pressing in passing) at 90% similarity.
+    # The genuine gesture-mapping complaints this keyword is meant for all
+    # contain the literal phrase "long press" (space, not hyphenated verb
+    # form), so exact matching alone still catches them correctly.
+    "long press",
+}
+
+# Keywords that must match as a whole word, not as a substring of a longer
+# word. "register" is a plain substring of "registered"/"registration", so
+# without this, a review about a "registered device" (nothing to do with
+# account registration) would wrongly match "register" -> Login issue.
+WORD_BOUNDARY_KEYWORDS = {"register"}
+
 
 def HearablesApp_WebScraping():
     # Local imports: only needed for actual scraping, not for the analysis
@@ -267,7 +356,15 @@ def HearablesApp_WebScraping():
     options.add_argument("--no-first-run --no-service-autorun --password-store=basic")
 
     # Start the driver
-    driver = uc.Chrome(options=options, version_main=149)
+    # FIX: version_main was previously hardcoded (e.g. version_main=149),
+    # which breaks the moment the locally installed Chrome browser
+    # auto-updates past that version (this is what caused:
+    # "SessionNotCreatedException ... This version of ChromeDriver only
+    # supports Chrome version 149. Current browser version is 152...").
+    # Leaving version_main unset lets undetected-chromedriver detect the
+    # installed Chrome major version itself and fetch a matching driver,
+    # so this keeps working across future Chrome auto-updates too.
+    driver = uc.Chrome(options=options)
     #driver = webdriver.Chrome()
 
     try:
@@ -648,6 +745,7 @@ def Positive_Reviews():
 
     print("Positive reviews saved to 'Android_HearablesApp_Review.xlsx' under sheet name 'Positive_Reviews'.")
 
+
 def normalize_unicode_text(text):
     """Convert stylized Unicode characters (𝓷𝓲𝓬𝓮 → nice) to plain ASCII."""
     return unicodedata.normalize('NFKD', text).encode('ascii', 'ignore').decode('ascii')
@@ -660,28 +758,50 @@ def extract_device_names(text, threshold=70):
         return "Unknown Device"
 
     txt = text.lower()
+    # Strip hyphens that sit between two letters (e.g. "Air-Dopes" -> "airdopes")
+    # before tokenizing. Without this, "air-dopes" splits into two separate
+    # words ("air", "dopes"); the initial fuzzy prefix scan can still loosely
+    # match the joined 2-word window against "Airdopes", but the later,
+    # stricter step that pinpoints exactly where the prefix ends only checks
+    # single-word windows and fails to find it -- sending the whole thing
+    # down an unreliable whole-review fuzzy fallback instead. Only letters
+    # are affected (not digits), so numeric ranges like "5-6" are untouched.
+    txt = re.sub(r'(?<=[a-z])-(?=[a-z])', '', txt)
     version_strings = re.findall(r'\b\d+\.\d+\b', txt)
     words = re.findall(r"[a-zA-Z0-9]+", txt)
     windows = words \
         + [" ".join(words[i:i+2]) for i in range(len(words)-1)] \
         + [" ".join(words[i:i+3]) for i in range(len(words)-2)]
     best_prefix = None
+    best_prefix_raw = None
     best_score = 0
     for w in windows:
         result = process.extractOne(
             w, [p.lower() for p in PREFIXES], scorer=fuzz.ratio
         )
-        if result and result[1] >= threshold and (
+        # Short prefixes need a near-exact match. "Stone" is only 5 letters, so
+        # changing one letter still scores 75-89 -- enough to clear the loose
+        # global threshold and turn ordinary words ("store" 80, "tone" 89,
+        # "one" 75) into a Stone speaker. Longer names (Airdopes, Nirvana...)
+        # lose far less score per wrong letter, so they keep the typo-friendly
+        # threshold.
+        min_score = threshold if (result and len(result[0]) > 5) else 90
+        if result and result[1] >= min_score and (
             result[1] > best_score or
             (result[1] == best_score and best_prefix and len(result[0]) > len(best_prefix))
         ):
             best_prefix = result[0]
+            best_prefix_raw = w
             best_score = result[1]
 
     canonical_prefix = DEVICE_TYPE_ALIAS.get(best_prefix, best_prefix.title() if best_prefix else None)
     txt_no_version = re.sub(r'\b\d+\.\d+\b', '', txt)
     nums = re.findall(r"\d+", txt_no_version)
 
+    # Suffixes are matched with (?<!\w)...(?!\w) rather than \b...\b. A
+    # word boundary never exists after a trailing symbol, so "pro+" could
+    # not match "Rockerz 255 Pro+ ..." and silently fell back to plain
+    # "pro" (giving "Rockerz 255 Pro", which is not a real product).
     SUFFIX_MAP = {
         "anc elite": "ANC Elite",
         "elite anc": "Elite ANC",
@@ -690,6 +810,7 @@ def extract_device_names(text, threshold=70):
         "anc": "ANC",
         "pro+": "Pro+",
         "pro plus": "Pro Plus",
+        "pro 2": "Pro 2",
         "pro": "Pro",
         "plus": "Plus",
         "prime": "Prime",
@@ -716,9 +837,11 @@ def extract_device_names(text, threshold=70):
         "crown": "Crown",
         "ivy pro": "Ivy Pro",
         "ivy": "Ivy",
+        "space 2": "Space 2",
         "space": "Space",
+        "airspeed pro": "Airspeed Pro",
+        "airspeed": "Airspeed",
         "lumos": "Lumos",
-        # ── Newly added suffixes ──────────────────────────────────────────
         "wave": "Wave",
         "neo": "Neo",
         "proclip": "ProClip",
@@ -744,42 +867,58 @@ def extract_device_names(text, threshold=70):
         "111 v2": "111v2",
         "joy": "Joy",
         "alpha": "Alpha",
-        "katana": "katana",
-        "kick": "kick",
-        "progear": "Progear",
-        "shiney": "Shiney",
+        "katana":"katana",
+        "kick":"kick",
+        "progear":"Progear",
+        "shiney":"Shiney",
+        "alpha gen 2":"alpha gen 2",
+        "alpha gen2":"alpha gen 2",
+    
     }
 
     model_num = None
     if nums and best_prefix:
-        # Prefer matching the FULL multi-word prefix so a suffix-map word that's
-        # actually part of the prefix itself (e.g. "Plus" inside "Rockerz Plus")
-        # isn't mistaken for the start of a suffix, which would wrongly cut off
-        # the model number that follows (e.g. "Rockerz Plus 550 ANC" losing "550").
-        full_prefix_match = re.search(re.escape(best_prefix), txt_no_version)
+        # Search for best_prefix_raw (the literal text that was actually
+        # found in the review, e.g. "avantq bar") rather than best_prefix
+        # (the canonical PREFIXES entry it fuzzy-matched to, e.g. "aavante
+        # bar"). If the review has a typo, the canonical spelling won't
+        # literally appear in the text at all -- searching for it returns
+        # no match, prefix_end_pos silently falls back to 0, and everything
+        # downstream (model number detection, suffix detection) gets thrown
+        # off, eventually causing a wrong final fuzzy-fallback match against
+        # a completely unrelated real product.
+        full_prefix_match = re.search(re.escape(best_prefix_raw), txt_no_version)
         if full_prefix_match:
             prefix_end_pos = full_prefix_match.end()
         else:
-            prefix_first_word = best_prefix.split()[0]
+            prefix_first_word = best_prefix_raw.split()[0]
             prefix_match = re.search(re.escape(prefix_first_word), txt_no_version)
             prefix_end_pos = prefix_match.end() if prefix_match else 0
 
         suffix_start_pos = len(txt_no_version)
         for key in sorted(SUFFIX_MAP.keys(), key=lambda x: -len(x)):
-            m = re.search(r"\b" + re.escape(key) + r"\b", txt_no_version)
+            m = re.search(r"(?<!\w)" + re.escape(key) + r"(?!\w)", txt_no_version)
             if m and m.start() > prefix_end_pos:
                 if m.start() < suffix_start_pos:
                     suffix_start_pos = m.start()
 
         num_positions = [(m.group(), m.start()) for m in re.finditer(r"\d+", txt_no_version)]
+        # Only accept a number that's genuinely close to the prefix (e.g. "Nirvana
+        # Ion 2" candidates within a couple words) -- not one buried much later in
+        # a long review describing something unrelated (e.g. "...stopped working
+        # after 2 month..."). Without this cap, that "2" would get wrongly glued
+        # onto the device name even though it's separated by a dozen+ words.
+        MAX_NUM_DISTANCE = 7
         between = [(n, pos) for n, pos in num_positions
-                   if pos >= prefix_end_pos and pos < suffix_start_pos]
+                   if pos >= prefix_end_pos and pos < suffix_start_pos
+                   and (pos - prefix_end_pos) <= MAX_NUM_DISTANCE]
         model_num_pos = None
         if between:
             model_num, model_num_pos = between[0]
         else:
             if suffix_start_pos == len(txt_no_version):
-                after_prefix = [(n, pos) for n, pos in num_positions if pos >= prefix_end_pos]
+                after_prefix = [(n, pos) for n, pos in num_positions
+                                 if pos >= prefix_end_pos and (pos - prefix_end_pos) <= MAX_NUM_DISTANCE]
                 if after_prefix:
                     model_num, model_num_pos = after_prefix[0]
 
@@ -790,7 +929,7 @@ def extract_device_names(text, threshold=70):
         version_str = version_strings[0]
         detected_suffix = ""
         for key in sorted(SUFFIX_MAP.keys(), key=lambda x: -len(x)):
-            if re.search(r"\b" + re.escape(key) + r"\b", txt):
+            if re.search(r"(?<!\w)" + re.escape(key) + r"(?!\w)", txt):
                 detected_suffix = SUFFIX_MAP[key]
                 break
         device = f"{canonical_prefix} {version_str} {model_num}"
@@ -799,42 +938,31 @@ def extract_device_names(text, threshold=70):
         return device.strip()
 
     if best_prefix and not model_num:
-        prefix_tokens = best_prefix.split()
+        # Locate the prefix using best_prefix_raw (the literal text that was
+        # actually matched, e.g. "avantq bar") instead of re-comparing words
+        # against the canonical best_prefix via fuzzy ratio. best_prefix_raw
+        # is already known to be an exact substring of the review (it came
+        # directly from `words`), so an exact window comparison is both
+        # simpler and more reliable than a second, stricter fuzzy pass that
+        # can fail on typos the first (looser) pass already accepted.
+        prefix_tokens = best_prefix_raw.split()
         prefix_end = -1
         for i in range(len(words)):
             window = " ".join(words[i:i + len(prefix_tokens)])
-            # Use a strict threshold here (not the loose global `threshold`) —
-            # we already know best_prefix is a confirmed match; this loop is
-            # only locating *where* it sits in the sentence. A loose threshold
-            # can false-match a shorter, wrong window (e.g. "my airdopes plus"
-            # scores ~74 against "airdopes plus spark"), truncating multi-word
-            # prefixes and corrupting everything extracted after them.
-            if fuzz.ratio(window, best_prefix) >= 95:
+            if window == best_prefix_raw:
                 prefix_end = i + len(prefix_tokens)
                 break
 
         if prefix_end != -1:
-            # Only search for a suffix within the 2 words immediately after
-            # the prefix — not the whole rest of the sentence. Searching the
-            # whole sentence let a much later, unrelated mention of a suffix
-            # word (e.g. "...please restore ANC settings" at the end of a
-            # review) get treated as part of the device name. Limiting to a
-            # 2-word window still tolerates one filler word before a real
-            # suffix (e.g. "Nirvana totally Lucid" -> still "Nirvana Lucid",
-            # the filler word itself is never captured) without reaching
-            # into unrelated parts of the sentence.
             remaining_words = words[prefix_end:]
             window_text = " ".join(remaining_words[:2])
 
             detected_suffix = ""
             for key in sorted(SUFFIX_MAP.keys(), key=lambda x: -len(x)):
-                if re.search(r"\b" + re.escape(key) + r"\b", window_text):
+                if re.search(r"(?<!\w)" + re.escape(key) + r"(?!\w)", window_text):
                     detected_suffix = SUFFIX_MAP[key]
                     break
 
-            # No middle-word capture: only take the next word if it IS a
-            # known suffix (e.g. "Nirvana Lucid", "Airdopes Supreme",
-            # "Stone Lumos"); otherwise return just the prefix.
             parts = [canonical_prefix]
             if detected_suffix:
                 parts.append(detected_suffix)
@@ -879,11 +1007,6 @@ def extract_device_names(text, threshold=70):
             return products[matched_idx]
         return "Unknown Device"
 
-    # Only search for a suffix within the 2 words immediately after the model
-    # number (e.g. "413" in "Airdopes Prime 413 ANC") — not the whole rest of
-    # the sentence. Searching everywhere let an unrelated, much later mention
-    # of a suffix word get glued onto the device name. A 2-word window still
-    # tolerates one filler word between the number and a real suffix.
     if best_prefix and model_num_pos is not None:
         tail_text = txt_no_version[model_num_pos + len(model_num):]
     else:
@@ -893,7 +1016,7 @@ def extract_device_names(text, threshold=70):
 
     detected_suffix = ""
     for key in sorted(SUFFIX_MAP.keys(), key=lambda x: -len(x)):
-        if re.search(r"\b" + re.escape(key) + r"\b", search_region):
+        if re.search(r"(?<!\w)" + re.escape(key) + r"(?!\w)", search_region):
             detected_suffix = SUFFIX_MAP[key]
             break
 
@@ -912,48 +1035,50 @@ def extract_device_names(text, threshold=70):
     return device.strip()
 
 
-# Remove emojis before sentiment analysis
 def remove_emojis(text):
     emoji_pattern = re.compile(
         "["
-        "\U0001F600-\U0001F64F"  # emoticons
-        "\U0001F300-\U0001F5FF"  # symbols & pictographs
-        "\U0001F680-\U0001F6FF"  # transport & map symbols
-        "\U0001F1E0-\U0001F1FF"  # flags (iOS)
-        "\U00002700-\U000027BF"  # dingbats
-        "\U0001F900-\U0001F9FF"  # supplemental symbols
-        "\U00002600-\U000026FF"  # miscellaneous symbols
-        "]+",
-        flags=re.UNICODE,
+        "\U0001F600-\U0001F64F"
+        "\U0001F300-\U0001F5FF"
+        "\U0001F680-\U0001F6FF"
+        "\U0001F1E0-\U0001F1FF"
+        "\U00002700-\U000027BF"
+        "\U0001F900-\U0001F9FF"
+        "\U00002600-\U000026FF"
+        "]+", flags=re.UNICODE,
     )
     return emoji_pattern.sub("", text)
 
 
 def contains_exception_phrase(text):
-    """
-    Returns True if any exception phrase matches fuzzily above threshold.
-    """
     text_lower = text.lower()
+    words = text_lower.split()
+
+    # Skip fuzzy matching entirely for very short reviews -- there's too
+    # little text to distinguish a genuine near-match from pure coincidence.
+    # This is what let "issue" wrongly fuzzy-match "It is super" at exactly
+    # 80% similarity, with zero actual relation to an app issue. Exact
+    # phrase matches (checked separately, unaffected by this guard) still
+    # apply regardless of length.
+    MIN_WORDS_FOR_FUZZY = 6
+    fuzzy_ok = len(words) > MIN_WORDS_FOR_FUZZY
+
     for phrase in EXCEPTION_PHRASES:
-        # Sliding window over words to check fuzzy match
-        words = text_lower.split()
+        if phrase in text_lower:
+            return True
+        if not fuzzy_ok:
+            continue
         for i in range(len(words)):
-            # check up to len(phrase.split())+1 words together
             window = " ".join(words[i:i+len(phrase.split())+1])
             score = fuzz.partial_ratio(phrase, window)
             if score >= THRESHOLD:
                 return True
     return False
 
+
 def is_valid_device(d, products_set):
-    """
-    Check if device d is valid.
-    - If numeric: match only against numeric parts of products_set
-    - Otherwise: exact match in products_set
-    """
     if d.isdigit():
         for product in products_set:
-            # Extract all numeric parts from product name
             nums = re.findall(r'\d+', product)
             if d in nums:
                 return True
@@ -963,10 +1088,6 @@ def is_valid_device(d, products_set):
 
 
 def get_sku_category(device_name):
-    """
-    Classify a device (as returned by extract_device_names) as 'SDK',
-    'Non-SDK', or 'Unknown' based on which product list it belongs to.
-    """
     if not device_name or device_name == "Unknown Device":
         return "Unknown"
 
@@ -994,49 +1115,61 @@ def is_sentiment_positive(review, sentiment_analyzer):
     cleaned = remove_emojis(review).strip()
     if not cleaned or len(cleaned.split()) > 5:
         return False
+    if is_ambiguous_neutral_review(cleaned):
+        return False
     try:
         return sentiment_analyzer(cleaned)[0]['label'].lower() == 'positive'
     except Exception:
         return False
 
 
+# Matches "can login"/"can log in" (login stated as WORKING, e.g. "Now i
+# can login but VIEW CONTROL option is disabled" -- the real complaint is
+# the disabled control, not login). A single grammatical pattern rather
+# than a list of specific phrases; naturally excludes negated forms like
+# "can't login"/"cannot login" since "can't"/"cannot" are different tokens
+# from bare "can".
+LOGIN_WORKING_PATTERN = re.compile(r'\bcan\s+log\s*in\b')
+
+
 def best_keyword_match(review_lower, keywords, threshold):
-    """
-    Three-tier matching:
-      Tier 1 (priority exact): keyword is in PRIORITY_KEYWORDS AND is a literal
-                               substring of the review. First match in
-                               PRIORITY_KEYWORDS order wins immediately.
-                               Also fuzzy-matches multi-word priority keywords
-                               for typo resilience.
-      Tier 2 (exact substring): keyword appears literally but is NOT a priority kw.
-                               Among all tier-2 hits, longest keyword wins.
-      Tier 3 (fuzzy only):     no exact match found at all; highest partial_ratio
-                               wins (ties broken by keyword length).
-    Returns "Other" if no keyword reaches `threshold`.
-    """
-    # Tier 1: priority keywords — exact first, then fuzzy for multi-word (typo resilience)
+    login_is_working = bool(LOGIN_WORKING_PATTERN.search(review_lower))
+
+    # Skip fuzzy matching entirely for very short reviews -- there's too
+    # little text to distinguish a genuine near-match from pure coincidence.
+    # This is what let "verify" wrongly fuzzy-match "very nice" (80%
+    # similarity, zero actual relation to account verification) and "improve
+    # the experience" wrongly fuzzy-match bare "nice" (85.7%). Exact
+    # substring matches (checked separately, unaffected by this guard) still
+    # apply regardless of length -- so something like 'Add "Disable Touch"
+    # feature.' still correctly matches "touch" exactly.
+    MIN_WORDS_FOR_FUZZY = 6
+    fuzzy_ok = len(review_lower.split()) > MIN_WORDS_FOR_FUZZY
+
     for pkw in PRIORITY_KEYWORDS:
         pkw_lower = pkw.lower()
 
-        # FIX: Short keywords (<=4 chars) — whole-word match only, never fuzzy
-        # Prevents "tab" matching inside "portable"/"absolutely", "anc" inside "ance" etc.
+        if pkw_lower in ("login", "log in") and login_is_working:
+            continue
+
         if len(pkw_lower) <= 4:
             if re.search(r'\b' + re.escape(pkw_lower) + r'\b', review_lower):
                 return pkw_lower
             continue
 
-        if pkw_lower in review_lower:
+        if pkw_lower in WORD_BOUNDARY_KEYWORDS:
+            if re.search(r'\b' + re.escape(pkw_lower) + r'\b', review_lower):
+                return pkw_lower
+        elif pkw_lower in review_lower:
             return pkw_lower
-        if len(pkw_lower.split()) > 1:
+        if fuzzy_ok and len(pkw_lower.split()) > 1 and pkw_lower not in EXACT_ONLY_KEYWORDS:
             score = fuzz.partial_ratio(pkw_lower, review_lower)
             if score >= threshold:
                 return pkw_lower
 
-    # Tier 2: exact substring, non-priority — longest wins
     exact_kw  = None
     exact_len = 0
 
-    # Tier 3: fuzzy fallback
     fuzzy_kw    = "Other"
     fuzzy_score = 0
     fuzzy_len   = 0
@@ -1044,8 +1177,14 @@ def best_keyword_match(review_lower, keywords, threshold):
     for kw in keywords:
         kw_lower = kw.lower()
 
-        # FIX: Short keywords (<=4 chars) — whole-word match only, never fuzzy
         if len(kw_lower) <= 4:
+            if re.search(r'\b' + re.escape(kw_lower) + r'\b', review_lower):
+                if len(kw_lower) > exact_len:
+                    exact_kw  = kw_lower
+                    exact_len = len(kw_lower)
+            continue
+
+        if kw_lower in WORD_BOUNDARY_KEYWORDS:
             if re.search(r'\b' + re.escape(kw_lower) + r'\b', review_lower):
                 if len(kw_lower) > exact_len:
                     exact_kw  = kw_lower
@@ -1056,6 +1195,9 @@ def best_keyword_match(review_lower, keywords, threshold):
             if len(kw_lower) > exact_len:
                 exact_kw  = kw_lower
                 exact_len = len(kw_lower)
+            continue
+
+        if not fuzzy_ok or kw_lower in EXACT_ONLY_KEYWORDS:
             continue
 
         score = fuzz.partial_ratio(kw_lower, review_lower)
@@ -1072,37 +1214,36 @@ def best_keyword_match(review_lower, keywords, threshold):
 def Negative_Reviews():
     df = pd.read_excel('Android_HearablesApp_Review.xlsx', sheet_name='Happ_Review_Data')
 
-    # ── Normalize stylized Unicode in Reviews column so readable text is stored ──
     df['Reviews'] = df['Reviews'].apply(
         lambda x: normalize_unicode_text(str(x)).strip() if pd.notna(x) else x
     )
 
-    negative_reviews_df = df[df['Ratings'].isin([1,2,3])].copy()
+    negative_reviews_df = df[df['Ratings'].isin([1, 2, 3])].copy()
     sentiment_analyzer = pipeline("sentiment-analysis")
 
     reasons, DUT = [], []
     for review in negative_reviews_df['Reviews']:
-        # ── Empty / NaN ──────────────────────────────────────────────────────
         if pd.isna(review) or not str(review).strip():
             reasons.append("Generic Comments")
             DUT.append("Unknown Device")
             continue
 
-        if is_sentiment_positive(review, sentiment_analyzer):
-            reasons.append("positive")
-            DUT.append(extract_device_names(review))
-            continue
-
+        # Three-tier rule, nothing else:
+        #  1. A matched keyword always wins -> its consolidated reason.
+        #  2. No keyword matched, model says positive -> Positive Feedback.
+        #  3. No keyword matched, not positive -> Generic Comments.
+        # Keyword matching runs first: a specific matched keyword is a
+        # stronger, more precise signal than a generic sentiment guess, so it
+        # should always take priority over sentiment.
         review_lower = review.lower()
         matched_category = best_keyword_match(review_lower, CATEGORY_KEYWORDS, THRESHOLD)
 
-        # ── Fallback to full sentiment if no keyword matched ──────────────────
         if matched_category == "Other":
-            clean_review = remove_emojis(review)
-            if contains_exception_phrase(clean_review):
-                sentiment = "neutral"
-            else:
-                sentiment = sentiment_analyzer(clean_review)[0]['label'].lower()
+            clean_review = remove_emojis(review).strip()
+            try:
+                sentiment = sentiment_analyzer(clean_review)[0]['label'].lower() if clean_review else "negative"
+            except Exception:
+                sentiment = "negative"
             if sentiment == "positive":
                 matched_category = "positive"
 
@@ -1112,24 +1253,27 @@ def Negative_Reviews():
     negative_reviews_df['Reason'] = reasons
     negative_reviews_df['DUT'] = DUT
 
-    # ── Consolidation ─────────────────────────────────────────────────────────
     consolidated_reasons = []
     products_set = set(products)
     reviews_list = negative_reviews_df['Reviews'].tolist()
 
-    # Reasons that map to features only available on SDK-integrated devices.
-    # If the reviewer's device is Non-SDK, these aren't bugs — the feature
-    # simply isn't supported on that hardware.
-    SDK_ONLY_FEATURE_REASONS = {"anc", "eq", "equalizer", "custom equalizer", "noise cancellation"}
+    SDK_ONLY_FEATURE_REASONS = {"anc", "eq", "equalizer", "custom equalizer", "noise cancellation", "sound setting", "sound settings"}
 
-    # Bare product-SERIES names (no specific model attached) — e.g. a review
-    # that only mentions "Nirvana" or "Airdopes" generically, with no model
-    # number/suffix for extract_device_names() to pin down. These are real
-    # boAt product lines, not an unsupported SKU, so they must NOT be flagged
-    # "SKU not supported" — they should fall through to normal reason-based
-    # consolidation just like any other row.
     BARE_PRODUCT_SERIES = {
         "Nirvana", "Airdopes", "Stone", "Rockerz", "Aavante", "Aavante Bar", "Immortal",
+    }
+
+    # Devices confirmed to use the Airoha SDK/chipset affected by the 16kb
+    # page limitation. Not every SDK device is actually on this chipset --
+    # only these are. So the "Equalizer and Anc removed for Airhoa SDK..."
+    # message should only fire when the device is genuinely unknown (can't
+    # rule it out) or is specifically one of these products. Any OTHER known
+    # device (even an SDK one) with an eq/anc/custom-equalizer complaint gets
+    # the plain base reason instead, since the 16kb-page explanation doesn't
+    # actually apply to it.
+    AIROHA_PRODUCTS = {
+        "Nirvana Lucid", "Nirvana Space", "Airdopes Flex 454 ANC", "NIRVANA 525ANC",
+        "Rockerz 255 Pro+", "Rockerz 333 Pro", "Rockerz 333", "Rockerz 330 Pro",
     }
 
     for review, reason, dut in zip(reviews_list, reasons, DUT):
@@ -1138,31 +1282,37 @@ def Negative_Reviews():
         review_lower = str(review).lower() if pd.notna(review) else ""
         sku_category = get_sku_category(d)
 
-        # ── SKU not supported: device extracted but not in known products list ──
-        if d != "Unknown Device" and d not in BARE_PRODUCT_SERIES and not is_valid_device(d, products_set):
-            consolidated = "SKU not supported"
+        # Feature-request / suggestion reasons should never get invalidated
+        # by a device-name extraction miss. These reviews often mention a
+        # product name loosely or in passing (e.g. "give more controls for
+        # RGB lights in arc pro plus"), and an imperfect DUT match there
+        # shouldn't override what's actually a clear, correctly-identified
+        # feature request -- the reason is what matters here, not whether
+        # the device name happened to extract perfectly.
+        FEATURE_REQUEST_REASONS = {"App Suggestion", "App Feature Addition"}
+        base_for_reason = CONSOLIDATION_MAP.get(r)
 
-        # ── Non-SDK device + SDK-only feature complaint: not a bug, hardware limitation ──
+        if base_for_reason in FEATURE_REQUEST_REASONS:
+            consolidated = base_for_reason
+        elif d != "Unknown Device" and d not in BARE_PRODUCT_SERIES and not is_valid_device(d, products_set):
+            consolidated = "SKU not supported"
+        elif sku_category == "Non-SDK" and r in {"eq", "equalizer"}:
+            consolidated = "Non-SDK - EQ Option"
         elif sku_category == "Non-SDK" and r in SDK_ONLY_FEATURE_REASONS:
             consolidated = "Non-SDK less feature"
-
-        # ── Force update vs regular update issue ──────────────────────────────
         elif r == "update":
             if any(sig in review_lower for sig in FORCE_UPDATE_SIGNALS):
                 consolidated = "Force App Update Not Required"
             else:
                 consolidated = "App Update issue"
-
-        # ── Standard consolidation map ─────────────────────────────────────────
         else:
-            # Get the base consolidation
             base_consolidated = CONSOLIDATION_MAP.get(r, "Generic Comments")
 
-            # 🔧 UNIFIED MESSAGE: Equalizer and ANC removed for Airhoa SDK 16KB page support
-            # (only reaches here for SDK/Unknown devices — Non-SDK devices with
-            # an ANC/EQ complaint were already routed to "Non-SDK less feature" above)
-            if base_consolidated in ["Equalizer issue", "Noise Cancellation Issue"]:
-                consolidated = "Equalizer and Anc removed for Airhoa SDK to support 16kb page"
+            if base_consolidated in ["Equalizer issue", "Noise Cancellation Issue", "Custom Equalizer issue"]:
+                if d == "Unknown Device" or d in AIROHA_PRODUCTS:
+                    consolidated = "Equalizer and Anc removed for Airhoa SDK to support 16kb page"
+                else:
+                    consolidated = base_consolidated
             else:
                 consolidated = base_consolidated
 
@@ -1170,16 +1320,13 @@ def Negative_Reviews():
 
     negative_reviews_df['Consolidated Reason'] = consolidated_reasons
 
-    # SKU Category (SDK / Non-SDK / Unknown) was already used internally above
-    # for the "Non-SDK less feature" consolidation rule (via get_sku_category),
-    # but is not added as a visible column here — downstream functions
-    # (Negative_Review_Analysis, Summary) recompute it from DUT as needed.
-
     with pd.ExcelWriter('Android_HearablesApp_Review.xlsx', engine='openpyxl', mode='a') as writer:
         negative_reviews_df.to_excel(writer, sheet_name='Negative_Reviews', index=False)
 
     print("Negative reviews and reasons saved to 'Negative_Reviews' sheet.")
     print("✅ Equalizer and Anc removed for Airhoa SDK to support 16kb page")
+
+
 
 def SheetNameChange():
     directory_path = os.path.dirname(os.path.realpath(__file__))  # Get the current script's directory
