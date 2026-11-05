@@ -238,6 +238,15 @@ def run_inference(model_path):
     df["AI_Consolidated_Reason\n[Testing Purpose]"] = consolidated_list
     df["QA Comments\n[give the comments based\non Consolidated reason]"] = ""
 
+    # Column order: ...boAt Reply | AI_Confidence | AI_Consolidated_Reason |
+    # Reason | DUT | Consolidated Reason | QA Comments
+    ai_conf = "AI_Confidence\n[Testing Purpose]"
+    ai_reason = "AI_Consolidated_Reason\n[Testing Purpose]"
+    qa_col = "QA Comments\n[give the comments based\non Consolidated reason]"
+    tail = [ai_conf, ai_reason, "Reason", "DUT", "Consolidated Reason", qa_col]
+    head = [c for c in df.columns if c not in tail]
+    df = df[head + [c for c in tail if c in df.columns]]
+
     # Write back to Negative_Reviews sheet
     with pd.ExcelWriter(EXCEL_PATH, engine="openpyxl", mode="a", if_sheet_exists="replace") as writer:
         df.to_excel(writer, sheet_name=OUTPUT_SHEET, index=False)
@@ -246,8 +255,17 @@ def run_inference(model_path):
     from openpyxl.styles import Alignment
     wb_fmt = load_workbook(EXCEL_PATH)
     ws_fmt = wb_fmt[OUTPUT_SHEET]
+    for row in ws_fmt.iter_rows(min_row=2):
+        for cell in row:
+            cell.alignment = Alignment(wrap_text=True, vertical="center")
     for cell in ws_fmt[1]:
         cell.alignment = Alignment(wrap_text=True, vertical="center", horizontal="center")
+    # Same spacing as the Positive_Reviews sheet, plus the extra columns
+    widths = {'A': 15, 'B': 15, 'C': 8, 'D': 42, 'E': 12.5, 'F': 11, 'G': 11,
+              'H': 10, 'I': 10, 'J': 48, 'K': 16, 'L': 28, 'M': 18, 'N': 24,
+              'O': 32, 'P': 40}
+    for col, width in widths.items():
+        ws_fmt.column_dimensions[col].width = width
     wb_fmt.save(EXCEL_PATH)
 
     print(f"\nResults written to sheet '{OUTPUT_SHEET}' in '{EXCEL_PATH}'")
