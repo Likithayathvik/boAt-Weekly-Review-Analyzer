@@ -58,6 +58,7 @@ PREFIXES = [
     "Stone",
     "PartyPal",
     "Nirvana Ion",
+    "Nirvana Primer",
     "Nirvana",
     "Rockerz Trinity",
     "Airdopes Ultra",
@@ -90,10 +91,13 @@ CATEGORY_KEYWORDS = ["battery information","charging information","Crash","batte
                      "freez","privacy","policy","account","screen","download","install","load","stuck","slow","support","warranty","app open","warranty","service","details",
                      "mydetails","personal information","personal","email address","email",
                      "control","not so much customisation","not much customization","give more controls","extra feature","touch control","remap",
-                     "compatible","customer care","complaint","service","ldac","tablet","tab","ipad","internet", "offline","syncing","hard reset","worst earbuds","one side works","don't buy","add more options","improve the experience","service ticket","physical damage","not getting the otp",]
+                     "compatible","customer care","complaint","service","ldac","tablet","tab","ipad","internet", "offline","syncing","hard reset","worst earbuds","one side works","don't buy","add more options","improve the experience","service ticket","physical damage","not getting the otp","latest update","recent update","after update","after the update","mic","very low","widget","ear detection",]
 
 PRIORITY_KEYWORDS = [
     "custom equalizer",
+    "latest update",
+    "recent update",
+    "otp",
     "not in the app",
     "not so much customisation",
     "not much customization",
@@ -126,7 +130,6 @@ PRIORITY_KEYWORDS = [
     "firmware update",
     "fw update",
     "app open",
-    "otp",
     "personal information",
     "email address",
     "mydetails",
@@ -154,9 +157,9 @@ SDK_PRODUCTS = [
     "Nirvana Ivy Pro", "Nirvana Zenith Pro", "Nirvana Iris", "PartyPal 600", "Rockerz 650 Pro",
     "Rockerz 551 ANC Pro", "Nirvana X TWS", "Airdopes 800 HiDef", "Nirvana Crystl",
     "Airdopes Ultra Pro", "Nirvana Lucid", "Nirvana Ion ANC Pro", "Rockerz 210 ANC",
-    "Nirvana Ivy", "Rockerz 255 Z Plus", "Stone Lumos", "Nirvana Space", "NIRVANA ZENITH",
+    "Nirvana Ivy", "Rockerz 255 Z Plus", "Stone Lumos", "Nirvana Space", "Nirvana Space 2", "NIRVANA ZENITH",
     "NIRVANA NEBULA", "Nirvana Eutopia", "Airdopes Supreme", "Rockerz 255 ANC",
-    "Nirvana Ion ANC", "Nirvana Ion", "Airdopes Flex 454 ANC", "Airdopes 800",
+    "Nirvana Ion ANC", "Nirvana Ion", "Nirvana Ion v2", "Airdopes Flex 454 ANC", "Airdopes 800",
     "Rockerz 255 Max", "Airdopes 300", "NIRVANA 525ANC", "Airdopes 341ANC", "Airdopes 393ANC",
     "Airdopes 172", "Rockerz 255 Pro+", "Rockerz Trinity Gen 2", "Rockerz 333 Pro",
     "Rockerz 333", "Rockerz 330 Pro",
@@ -214,10 +217,18 @@ CONSOLIDATION_MAP = {
     "battery percentage": "Battery Information",
     "battery drain": "Product Issue",
     "sound quality": "Product Issue",
+    "mic": "Product Issue",
+    "very low": "Product Issue",
+    "latest update": "Firmware Update",
+    "recent update": "Firmware Update",
+    "widget": "App Suggestion",
+    "ear detection": "App feature Issue",
+    "after update": "Firmware Update",
+    "after the update": "Firmware Update",
     "battery": "Battery Information",
     "percentage": "Battery Information",          
     "noise cancellation": "Noise Cancellation Issue",
-    "long press": "Button Mapping",
+    "long press": "Button Customization",
     "sound setting": "Equalizer issue",
     "sound settings": "Equalizer issue",
     "anc": "Noise Cancellation Issue",
@@ -315,6 +326,7 @@ def is_ambiguous_neutral_review(text):
 # class entirely.
 EXACT_ONLY_KEYWORDS = {
     "dual connection",
+    "latest update", "recent update", "after update", "after the update",
     # "touch" fuzzy-matched unrelated text like "ability to change" (the
     # fragment "ty to ch" scores 80% similarity to "touch" purely by letter
     # overlap, with zero actual relation to touch controls) -- same class of
@@ -786,6 +798,12 @@ def extract_device_names(text, threshold=70):
         # lose far less score per wrong letter, so they keep the typo-friendly
         # threshold.
         min_score = threshold if (result and len(result[0]) > 5) else 90
+        # A multi-word prefix must match word-for-word, not just overall:
+        # "one year" scored 70.6 against "stone arc" purely on letter overlap
+        # and turned ordinary reviews into a Stone Arc speaker.
+        if result and len(result[0].split()) > 1 and len(w.split()) == len(result[0].split()):
+            if any(fuzz.ratio(a, b) < 60 for a, b in zip(w.split(), result[0].split())):
+                continue
         if result and result[1] >= min_score and (
             result[1] > best_score or
             (result[1] == best_score and best_prefix and len(result[0]) > len(best_prefix))
@@ -842,6 +860,7 @@ def extract_device_names(text, threshold=70):
         "airspeed pro": "Airspeed Pro",
         "airspeed": "Airspeed",
         "lumos": "Lumos",
+        "ignite": "Ignite",
         "wave": "Wave",
         "neo": "Neo",
         "proclip": "ProClip",
@@ -998,6 +1017,15 @@ def extract_device_names(text, threshold=70):
                 if detected_suffix:
                     break
         if detected_suffix:
+            # No brand word was written ("415 Prime"), so the number and
+            # suffix may be in the opposite order from the catalog name
+            # ("Rockerz Prime 415"). If exactly one catalog product contains
+            # both the number and every suffix word, that's the device.
+            wanted = {model_num.lower()} | set(detected_suffix.lower().split())
+            candidates = [p for p in products
+                          if wanted <= set(re.findall(r"[a-z0-9+]+", p.lower()))]
+            if len(candidates) == 1:
+                return candidates[0]
             return f"{model_num} {detected_suffix}".strip()
         fallback = process.extractOne(
             txt, [p.lower() for p in products], scorer=fuzz.partial_ratio
@@ -1132,7 +1160,26 @@ def is_sentiment_positive(review, sentiment_analyzer):
 LOGIN_WORKING_PATTERN = re.compile(r'\bcan\s+log\s*in\b')
 
 
-def best_keyword_match(review_lower, keywords, threshold):
+# Gesture/touch wording. When a review is clearly about touch/tap/press
+# gestures, a "not much customization" phrase means button customization,
+# not a generic limited-feature complaint.
+GESTURE_CONTEXT = re.compile(r'\b(touch\w*|taps?|tapping|gestures?|long[\s-]?press\w*|mapping|mapped|remap\w*)\b')
+GESTURE_OVERRIDDEN_KEYWORDS = {"not much customization", "not so much customisation"}
+
+
+def mask_device_mention(review_lower, dut):
+    """Blank out the device's own name (e.g. the "ANC" in "Nirvana Ion ANC")
+    so a product name is never mistaken for the issue being reported."""
+    if not dut or dut == "Unknown Device":
+        return review_lower
+    words = re.findall(r"[a-z0-9+]+", dut.lower())
+    if not words:
+        return review_lower
+    pattern = r"(?<!\w)" + r"[\s\-]*".join(re.escape(w) for w in words) + r"(?!\w)"
+    return re.sub(pattern, " ", review_lower)
+
+
+def best_keyword_match(review_lower, keywords, threshold, skip=()):
     login_is_working = bool(LOGIN_WORKING_PATTERN.search(review_lower))
 
     # Skip fuzzy matching entirely for very short reviews -- there's too
@@ -1148,6 +1195,8 @@ def best_keyword_match(review_lower, keywords, threshold):
 
     for pkw in PRIORITY_KEYWORDS:
         pkw_lower = pkw.lower()
+        if pkw_lower in skip:
+            continue
 
         if pkw_lower in ("login", "log in") and login_is_working:
             continue
@@ -1176,6 +1225,8 @@ def best_keyword_match(review_lower, keywords, threshold):
 
     for kw in keywords:
         kw_lower = kw.lower()
+        if kw_lower in skip:
+            continue
 
         if len(kw_lower) <= 4:
             if re.search(r'\b' + re.escape(kw_lower) + r'\b', review_lower):
@@ -1236,7 +1287,12 @@ def Negative_Reviews():
         # stronger, more precise signal than a generic sentiment guess, so it
         # should always take priority over sentiment.
         review_lower = review.lower()
-        matched_category = best_keyword_match(review_lower, CATEGORY_KEYWORDS, THRESHOLD)
+        dut_name = extract_device_names(review)
+        keyword_text = mask_device_mention(review_lower, dut_name)
+        matched_category = best_keyword_match(keyword_text, CATEGORY_KEYWORDS, THRESHOLD)
+        if matched_category in GESTURE_OVERRIDDEN_KEYWORDS and GESTURE_CONTEXT.search(keyword_text):
+            matched_category = best_keyword_match(
+                keyword_text, CATEGORY_KEYWORDS, THRESHOLD, skip=GESTURE_OVERRIDDEN_KEYWORDS)
 
         if matched_category == "Other":
             clean_review = remove_emojis(review).strip()
@@ -1248,7 +1304,7 @@ def Negative_Reviews():
                 matched_category = "positive"
 
         reasons.append(matched_category)
-        DUT.append(extract_device_names(review))
+        DUT.append(dut_name)
 
     negative_reviews_df['Reason'] = reasons
     negative_reviews_df['DUT'] = DUT
@@ -1374,7 +1430,7 @@ def Sorting_Xlsx(sheet_name):
     worksheet = workbook[sheet_name]
 
     # Define the column widths you want to set (e.g., columns A, B, and C)
-    column_widths = {'A': 15, 'B': 15, 'C': 8, 'D': 42, 'E': 12.5, 'F': 11, 'G': 11, 'H': 10, 'I': 10, 'J': 48, 'K': 15, 'L': 21} # You can adjust the values as needed
+    column_widths = {'A': 15, 'B': 15, 'C': 8, 'D': 42, 'E': 12.5, 'F': 11, 'G': 11, 'H': 10, 'I': 10, 'J': 48, 'K': 18, 'L': 24, 'M': 32} # You can adjust the values as needed
 
     # Set the column widths
     for column, width in column_widths.items():
