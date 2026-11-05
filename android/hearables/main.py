@@ -7,6 +7,7 @@
 # ============================================================
 
 import os
+import re
 import json
 import uuid
 import time
@@ -198,35 +199,49 @@ def App_Version_Finder():
     APP_VERSION_COL = 9
     highest_version = None
 
+    all_versions = set()
     for row in range(2, sheet.max_row + 1):
         ver = sheet.cell(row=row, column=APP_VERSION_COL).value
         if ver:
             ver_str = str(ver).strip()
-            if highest_version is None or ver_str > highest_version:
+            if not version_key(ver_str):
+                continue  # skip non-version values
+            all_versions.add(ver_str)
+            if version_key(ver_str) > version_key(highest_version):
                 highest_version = ver_str
 
     App_Version = highest_version if highest_version else "N/A"
-    print(f"  Highest App Version: {App_Version}")
+    print(f"  Versions in this week's reviews: "
+          f"{', '.join(sorted(all_versions, key=version_key)) or 'none'}")
+    print(f"  App Version used (highest in Excel): {App_Version}")
     workbook.close()
+
+
+def version_key(ver):
+    """'1.8.10' -> (1, 8, 10) so versions compare as numbers, not text
+    (as text, '1.8.10' < '1.8.9'). Non-version values -> () and always lose."""
+    if not ver or not re.match(r"^\s*\d", str(ver)):
+        return ()
+    return tuple(int(p) for p in re.findall(r"\d+", str(ver)))
 
 
 def App_Rating_Finder():
     """
-    Fetch live app rating and version from the public Play Store page
-    using google_play_scraper. Falls back to week-average if blocked.
+    Fetch live app rating from the public Play Store page using
+    google_play_scraper. Falls back to week-average if blocked.
+    App Version is NOT taken from here: the listing can lag behind (2 Nov
+    2026 it said 1.8.8 while reviews were on 1.8.9), so App Version always
+    comes from the highest version in this week's reviews (App_Version_Finder).
     """
     global App_Rating
-    global App_Version
 
     try:
         from google_play_scraper import app as gplay_app
         result      = gplay_app(APP_ID, lang="en", country="in")
         score       = result.get("score")
-        version     = result.get("version")
         App_Rating  = f"{score:.1f}" if isinstance(score, (int, float)) else "N/A"
-        App_Version = version if version else App_Version
         print(f"  Live Play Store Rating  : {App_Rating}")
-        print(f"  Live Play Store Version : {App_Version}")
+        print(f"  Live Play Store Version : {result.get('version')} (info only, not used)")
     except Exception as e:
         print(f"  ⚠️  Live Play Store scrape failed ({e}); falling back to this week's review average.")
         workbook = openpyxl.load_workbook(XLSX_FILE)

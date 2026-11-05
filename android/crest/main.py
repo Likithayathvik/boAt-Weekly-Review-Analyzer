@@ -7,6 +7,7 @@
 # ============================================================
 
 import os
+import re
 import json
 import uuid
 import time
@@ -202,16 +203,29 @@ def App_Version_Finder():
     APP_VERSION_COL = 9
     highest_version = None
 
+    all_versions = set()
     for row in range(2, sheet.max_row + 1):
         ver = sheet.cell(row=row, column=APP_VERSION_COL).value
         if ver:
             ver_str = str(ver).split(":")[-1].strip()
-            if highest_version is None or ver_str > highest_version:
+            if not version_key(ver_str):
+                continue  # skip non-version values
+            all_versions.add(ver_str)
+            if version_key(ver_str) > version_key(highest_version):
                 highest_version = ver_str
 
     App_Version = highest_version if highest_version else "N/A"
-    print(f"  Highest App Version: {App_Version}")
+    print(f"  Versions in this week's reviews: "
+          f"{', '.join(sorted(all_versions, key=version_key)) or 'none'}")
+    print(f"  App Version used (highest in Excel): {App_Version}")
     workbook.close()
+
+def version_key(ver):
+    """'1.8.10' -> (1, 8, 10) so versions compare as numbers, not text
+    (as text, '1.8.10' < '1.8.9'). Non-version values -> () and always lose."""
+    if not ver or not re.match(r"^\s*\d", str(ver)):
+        return ()
+    return tuple(int(p) for p in re.findall(r"\d+", str(ver)))
 
 # ── STEP 2b: FETCH LIVE APP RATING + VERSION (public Play Store scrape) ─────
 def App_Rating_Finder():
@@ -228,7 +242,7 @@ def App_Rating_Finder():
     only if the live scrape fails for any reason, so the pipeline never
     breaks or reports a blank N/A when a fallback is possible.
     """
-    global App_Rating, App_Version
+    global App_Rating
 
     try:
         result = gplay_app(APP_ID, lang='en', country='in')
@@ -236,11 +250,12 @@ def App_Rating_Finder():
         version = result.get('version')
 
         App_Rating  = f"{score:.1f}" if isinstance(score, (int, float)) else "N/A"
-        if version:
-            App_Version = str(version)
+        # App Version is NOT taken from the listing: it can lag behind
+        # (2 Nov 2026 Hearables: listing 1.8.8, reviews 1.8.9). App Version
+        # always comes from the highest version in this week's reviews.
 
         print(f"  Live Play Store Rating  : {App_Rating}")
-        print(f"  Live Play Store Version : {App_Version}")
+        print(f"  Live Play Store Version : {version} (info only, not used)")
         return
     except Exception as e:
         print(f"  ⚠️  Live Play Store scrape failed ({e}); "
