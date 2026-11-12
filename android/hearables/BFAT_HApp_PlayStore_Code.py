@@ -763,7 +763,19 @@ def normalize_unicode_text(text):
     return unicodedata.normalize('NFKD', text).encode('ascii', 'ignore').decode('ascii')
 
 
+# Names customers commonly write that are really a catalog product.
+# "Nirvana Ion Space" is not a separate product; it is Nirvana Space.
+DEVICE_NAME_CORRECTIONS = {
+    "Nirvana Ion Space": "Nirvana Space",
+}
+
+
 def extract_device_names(text, threshold=70):
+    device = _extract_device_names_raw(text, threshold)
+    return DEVICE_NAME_CORRECTIONS.get(device, device)
+
+
+def _extract_device_names_raw(text, threshold=70):
     if not text or not isinstance(text, str):
         return "Unknown Device"
     if len(text.split()) <= 2:
@@ -998,6 +1010,28 @@ def extract_device_names(text, threshold=70):
         return "Unknown Device"
 
     if not best_prefix:
+        # Customers often write the company name instead of the product
+        # line ("boat 191 anc", "boat prime 412"). "boAt" followed by a model
+        # number means an Airdopes product, and that number (not an unrelated
+        # price like "1800 rupees") is the model.
+        boat_match = re.search(r"\bboat\s+((?:[a-z+]+\s+)?)(\d{2,3})\b(?:\s+([a-z+]+))?", txt)
+        if boat_match:
+            before, number, after = boat_match.group(1).strip(), boat_match.group(2), boat_match.group(3)
+            parts = ["Airdopes"]
+            if before and before in SUFFIX_MAP:
+                parts.append(SUFFIX_MAP[before])
+            parts.append(number)
+            if after and after in SUFFIX_MAP:
+                parts.append(SUFFIX_MAP[after])
+            # If exactly one catalog product has this number plus the suffix
+            # words (e.g. "boat 415 prime" -> Rockerz Prime 415), use it.
+            wanted = {number} | {w.lower() for p_ in parts[1:] if p_ != number for w in p_.split()}
+            candidates = [p for p in products
+                          if wanted <= set(re.findall(r"[a-z0-9+]+", p.lower()))]
+            if len(candidates) == 1:
+                return candidates[0]
+            return " ".join(parts)
+
         detected_suffix = ""
         for key in sorted(SUFFIX_MAP.keys(), key=lambda x: -len(x)):
             for num in nums:
